@@ -102,11 +102,27 @@ const statusOrderSql = ITEM_STATUS_SORT_ORDER
   .map((status, index) => `WHEN ${status} THEN ${index + 1}`)
   .join(' ')
 
+function refreshMaintenanceStatuses() {
+  database.prepare(`
+    UPDATE items
+    SET status = CASE
+      WHEN date(replace(date, '/', '-')) < date('now', 'localtime')
+        THEN ${ITEM_STATUS.EXPIRED}
+      WHEN date(replace(date, '/', '-')) <= date('now', 'localtime', '+2 days')
+        THEN ${ITEM_STATUS.EXPIRING_SOON}
+      ELSE ${ITEM_STATUS.NORMAL}
+    END
+    WHERE type = ${ITEM_TYPE.MAINTENANCE} AND date IS NOT NULL
+  `).run()
+}
+
 const server = createServer(async (request, response) => {
   const url = new URL(request.url, 'http://localhost')
   const idMatch = url.pathname.match(/^\/api\/items\/(\d+)$/)
 
   try {
+    refreshMaintenanceStatuses()
+
     if (request.method === 'GET' && url.pathname === '/api/items/stats') {
       const stats = database.prepare(`
         SELECT status, COUNT(*) AS count
@@ -164,7 +180,28 @@ const server = createServer(async (request, response) => {
         INSERT INTO items (name, type, place, date, count, status, image, last_date, cycle, threshold)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(item.name, item.type, item.place, item.date ?? null, item.count ?? null, item.status, item.image ?? null, item.lastDate ?? null, item.cycle ?? null, item.threshold ?? null)
+      refreshMaintenanceStatuses()
       return sendJson(response, 201, database.prepare(`SELECT ${itemColumns} FROM items WHERE id = ?`).get(result.lastInsertRowid))
+    }
+
+    const useOneMatch = url.pathname.match(/^\/api\/items\/(\d+)\/use-one$/)
+    if (request.method === 'POST' && useOneMatch) {
+      const id = Number(useOneMatch[1])
+      const item = database.prepare(`SELECT ${itemColumns} FROM items WHERE id = ?`).get(id)
+      if (!item) return sendJson(response, 404, { message: '找不到這筆品項' })
+      if (item.type !== ITEM_TYPE.STOCK) return sendJson(response, 400, { message: '只有庫存備品可以執行此操作' })
+      if (item.count === null || item.count <= 0) return sendJson(response, 400, { message: '目前庫存已經是 0' })
+
+      database.prepare(`
+        UPDATE items
+        SET count = count - 1,
+            status = CASE
+              WHEN count - 1 < COALESCE(threshold, 0) THEN ${ITEM_STATUS.OUT_OF_STOCK}
+              ELSE ${ITEM_STATUS.NORMAL}
+            END
+        WHERE id = ?
+      `).run(id)
+      return sendJson(response, 200, database.prepare(`SELECT ${itemColumns} FROM items WHERE id = ?`).get(id))
     }
 
     if (request.method === 'PUT' && idMatch) {
@@ -176,6 +213,7 @@ const server = createServer(async (request, response) => {
         WHERE id = ?
       `).run(item.name, item.type, item.place, item.date ?? null, item.count ?? null, item.status, item.image ?? null, item.lastDate ?? null, item.cycle ?? null, item.threshold ?? null, id)
       if (result.changes === 0) return sendJson(response, 404, { message: '找不到這筆品項' })
+      refreshMaintenanceStatuses()
       return sendJson(response, 200, database.prepare(`SELECT ${itemColumns} FROM items WHERE id = ?`).get(id))
     }
 

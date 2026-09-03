@@ -20,13 +20,15 @@
         </div>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>品項</th><th>類型</th><th>放置位置</th><th>下次維護</th><th>目前數量</th><th>狀態</th><th>操作</th></tr></thead>
+            <thead><tr><th>品項</th><th>狀態</th><th>目前數量</th><th>下次維護</th><th>放置位置</th><th>類型</th><th>編輯</th></tr></thead>
             <tbody>
               <tr v-for="item in filteredItems" :key="item.id">
                 <td><div class="item-name"><button v-if="item.image" class="thumb image-preview-button" type="button" :aria-label="`放大查看${item.name}圖片`" @click="previewImage = item.image"><img :src="item.image" :alt="item.name" /></button><span v-else class="thumb">{{ item.type === ITEM_TYPE.STOCK ? '◇' : '▣' }}</span><b>{{ item.name }}</b></div></td>
-                <td><span class="badge" :class="item.type === ITEM_TYPE.STOCK ? 'orange' : 'green'">{{ getItemTypeLabel(item.type) }}</span></td>
-                <td>{{ item.place }}</td><td>{{ item.date??'-' }}</td><td>{{ item.count??'-' }}</td>
                 <td><span class="badge" :class="statusTone(item.status)">{{ getItemStatusLabel(item.status) }}</span></td>
+                <td><div class="item-count"><span>{{ item.count??'-' }}</span><button v-if="item.type === ITEM_TYPE.STOCK && item.count > 0" class="use-one-button" type="button" @click="itemToUse = item">我用了一個</button></div></td>
+                <td>{{ item.date??'-' }}</td>
+                <td>{{ item.place }}</td>
+                <td><span class="badge" :class="item.type === ITEM_TYPE.STOCK ? 'orange' : 'green'">{{ getItemTypeLabel(item.type) }}</span></td>
                 <td><button class="more" aria-label="修改品項" @click="openEditModal(item)">⋮</button></td>
               </tr>
               <tr v-if="loadError"><td colspan="7" class="empty">{{ loadError }}</td></tr>
@@ -45,6 +47,19 @@
         </footer>
       </section>
       <AddItemModal v-if="showAddModal" :item="selectedItem" @close="showAddModal = false" @saved="itemSaved" />
+      <Teleport to="body">
+        <div v-if="itemToUse" class="fixed inset-0 z-120 grid place-items-center bg-black/45 p-4" @click.self="itemToUse = null">
+          <section class="w-full max-w-[410px] rounded-2xl bg-white p-6 shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="use-one-title">
+            <h2 id="use-one-title" class="m-0 text-xl">確認使用庫存</h2>
+            <p class="my-4 text-[#555d59]">確定使用一個 <b class="text-[#087747]">{{ itemToUse.name }}</b> 嗎？<br>目前庫存將從 <b class="text-[#ef7300]">{{ itemToUse.count }}</b> 扣為 <b class="text-[#ef7300]">{{ itemToUse.count - 1 }}</b>。</p>
+            <p v-if="useOneError" class="mb-3 text-sm text-red-600">{{ useOneError }}</p>
+            <footer class="flex justify-end gap-3 [&_button]:h-10 [&_button]:min-w-24 [&_button]:cursor-pointer [&_button]:rounded-lg">
+              <button class="border border-[#cbd1ce] bg-white" type="button" @click="itemToUse = null">取消</button>
+              <button class="border-0 bg-[#087d4b] !text-white disabled:opacity-60" type="button" :disabled="usingItem" @click="useOneItem">{{ usingItem ? '處理中…' : '確定' }}</button>
+            </footer>
+          </section>
+        </div>
+      </Teleport>
       <Teleport to="body">
         <div v-if="previewImage" class="fixed inset-0 z-110 flex items-center justify-center bg-black/75 p-6" role="dialog" aria-modal="true" aria-label="品項圖片預覽" @click.self="previewImage = ''">
           <img class="max-h-[90vh] max-w-[90vw] rounded-xl object-contain shadow-2xl" :src="previewImage" alt="品項放大圖片" />
@@ -75,6 +90,9 @@ const loadError = ref('')
 const showAddModal = ref(false)
 const selectedItem = ref(null)
 const previewImage = ref('')
+const itemToUse = ref(null)
+const usingItem = ref(false)
+const useOneError = ref('')
 const selectedStatus = ref(null)
 const search = ref('')
 const page = ref(1)
@@ -160,6 +178,22 @@ function openAddModal() {
 function openEditModal(item) {
   selectedItem.value = item
   showAddModal.value = true
+}
+
+async function useOneItem() {
+  usingItem.value = true
+  useOneError.value = ''
+  try {
+    const response = await fetch(`/api/items/${itemToUse.value.id}/use-one`, { method: 'POST' })
+    const result = response.status === 204 ? null : await response.json()
+    if (!response.ok) throw new Error(result?.message || '更新庫存失敗')
+    itemToUse.value = null
+    await Promise.all([loadItems(), loadStats()])
+  } catch (error) {
+    useOneError.value = error.message
+  } finally {
+    usingItem.value = false
+  }
 }
 
 async function itemSaved() {
