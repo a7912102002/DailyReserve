@@ -121,7 +121,7 @@ async function submitItem() {
     method: isEditing.value ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       name: form.name, type: form.type,
-      place: form.place || '尚未設定', image: imagePreview.value || null,
+      place: form.place || '-', image: imagePreview.value || null,
       date: isStock ? null : nextDate.value, count: isStock ? form.count : null,
       status: isStock && form.count < form.threshold ? ITEM_STATUS.OUT_OF_STOCK : ITEM_STATUS.NORMAL,
       lastDate: isStock ? null : form.lastDate, cycle: isStock ? null : form.cycle,

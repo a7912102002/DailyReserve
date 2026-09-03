@@ -204,6 +204,29 @@ const server = createServer(async (request, response) => {
       return sendJson(response, 200, database.prepare(`SELECT ${itemColumns} FROM items WHERE id = ?`).get(id))
     }
 
+    const maintainMatch = url.pathname.match(/^\/api\/items\/(\d+)\/maintain$/)
+    if (request.method === 'POST' && maintainMatch) {
+      const id = Number(maintainMatch[1])
+      const { maintenanceDate } = await readJson(request)
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(maintenanceDate || '')) {
+        return sendJson(response, 400, { message: '維護日期格式必須是 YYYY-MM-DD' })
+      }
+
+      const item = database.prepare(`SELECT ${itemColumns} FROM items WHERE id = ?`).get(id)
+      if (!item) return sendJson(response, 404, { message: '找不到這筆品項' })
+      if (item.type !== ITEM_TYPE.MAINTENANCE) return sendJson(response, 400, { message: '只有定期維護品項可以執行此操作' })
+
+      database.prepare(`
+        UPDATE items
+        SET last_date = ?,
+            cycle = COALESCE(cycle, 7),
+            date = strftime('%Y/%m/%d', date(?, '+' || COALESCE(cycle, 7) || ' days'))
+        WHERE id = ?
+      `).run(maintenanceDate, maintenanceDate, id)
+      refreshMaintenanceStatuses()
+      return sendJson(response, 200, database.prepare(`SELECT ${itemColumns} FROM items WHERE id = ?`).get(id))
+    }
+
     if (request.method === 'PUT' && idMatch) {
       const id = Number(idMatch[1])
       const item = await readJson(request)

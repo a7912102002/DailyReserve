@@ -26,8 +26,8 @@
                 <td><div class="item-name"><button v-if="item.image" class="thumb image-preview-button" type="button" :aria-label="`放大查看${item.name}圖片`" @click="previewImage = item.image"><img :src="item.image" :alt="item.name" /></button><span v-else class="thumb">{{ item.type === ITEM_TYPE.STOCK ? '◇' : '▣' }}</span><b>{{ item.name }}</b></div></td>
                 <td><span class="badge" :class="statusTone(item.status)">{{ getItemStatusLabel(item.status) }}</span></td>
                 <td><div class="item-count"><span>{{ item.count??'-' }}</span><button v-if="item.type === ITEM_TYPE.STOCK && item.count > 0" class="use-one-button" type="button" @click="itemToUse = item">我用了一個</button></div></td>
-                <td>{{ item.date??'-' }}</td>
-                <td>{{ item.place }}</td>
+                <td><div class="maintenance-cell"><span>{{ item.date??'-' }}</span><button v-if="item.type === ITEM_TYPE.MAINTENANCE && [ITEM_STATUS.EXPIRING_SOON, ITEM_STATUS.EXPIRED].includes(item.status)" class="maintained-button" type="button" @click="openMaintainModal(item)">已維護</button></div></td>
+                <td>{{ item.place && item.place !== '尚未設定' ? item.place : '-' }}</td>
                 <td><span class="badge" :class="item.type === ITEM_TYPE.STOCK ? 'orange' : 'green'">{{ getItemTypeLabel(item.type) }}</span></td>
                 <td><button class="more" aria-label="修改品項" @click="openEditModal(item)">⋮</button></td>
               </tr>
@@ -56,6 +56,20 @@
             <footer class="flex justify-end gap-3 [&_button]:h-10 [&_button]:min-w-24 [&_button]:cursor-pointer [&_button]:rounded-lg">
               <button class="border border-[#cbd1ce] bg-white" type="button" @click="itemToUse = null">取消</button>
               <button class="border-0 bg-[#087d4b] !text-white disabled:opacity-60" type="button" :disabled="usingItem" @click="useOneItem">{{ usingItem ? '處理中…' : '確定' }}</button>
+            </footer>
+          </section>
+        </div>
+      </Teleport>
+      <Teleport to="body">
+        <div v-if="itemToMaintain" class="fixed inset-0 z-120 grid place-items-center bg-black/45 p-4" @click.self="itemToMaintain = null">
+          <section class="w-full max-w-[410px] rounded-2xl bg-white p-6 shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="maintain-title">
+            <h2 id="maintain-title" class="m-0 text-xl">確認已完成維護</h2>
+            <p class="mt-3 mb-4 text-[#555d59]">「<b class="text-[#087747]">{{ itemToMaintain.name }}</b>」的維護日期：</p>
+            <label class="mb-4 block"><span class="mb-1.5 block font-medium">維護日期</span><input v-model="maintenanceDate" class="h-11 w-full rounded-lg border border-[#cbd1ce] px-3 outline-none focus:border-[#087d4b]" type="date" required /></label>
+            <p v-if="maintainError" class="mb-3 text-sm text-red-600">{{ maintainError }}</p>
+            <footer class="flex justify-end gap-3 [&_button]:h-10 [&_button]:min-w-24 [&_button]:cursor-pointer [&_button]:rounded-lg">
+              <button class="border border-[#cbd1ce] bg-white" type="button" @click="itemToMaintain = null">取消</button>
+              <button class="border-0 bg-[#087d4b] !text-white disabled:opacity-60" type="button" :disabled="maintainingItem || !maintenanceDate" @click="confirmMaintained">{{ maintainingItem ? '處理中…' : '確定' }}</button>
             </footer>
           </section>
         </div>
@@ -93,6 +107,10 @@ const previewImage = ref('')
 const itemToUse = ref(null)
 const usingItem = ref(false)
 const useOneError = ref('')
+const itemToMaintain = ref(null)
+const maintenanceDate = ref('')
+const maintainingItem = ref(false)
+const maintainError = ref('')
 const selectedStatus = ref(null)
 const search = ref('')
 const page = ref(1)
@@ -148,7 +166,11 @@ async function loadStats() {
 }
 
 function handleKeydown(event) {
-  if (event.key === 'Escape') previewImage.value = ''
+  if (event.key === 'Escape') {
+    previewImage.value = ''
+    itemToUse.value = null
+    itemToMaintain.value = null
+  }
 }
 
 onMounted(() => {
@@ -193,6 +215,33 @@ async function useOneItem() {
     useOneError.value = error.message
   } finally {
     usingItem.value = false
+  }
+}
+
+function openMaintainModal(item) {
+  const now = new Date()
+  const localToday = new Date(now.getTime() - now.getTimezoneOffset() * 60_000).toISOString().slice(0, 10)
+  itemToMaintain.value = item
+  maintenanceDate.value = localToday
+  maintainError.value = ''
+}
+
+async function confirmMaintained() {
+  maintainingItem.value = true
+  maintainError.value = ''
+  try {
+    const response = await fetch(`/api/items/${itemToMaintain.value.id}/maintain`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ maintenanceDate: maintenanceDate.value }),
+    })
+    const result = await response.json()
+    if (!response.ok) throw new Error(result.message || '更新維護日期失敗')
+    itemToMaintain.value = null
+    await Promise.all([loadItems(), loadStats()])
+  } catch (error) {
+    maintainError.value = error.message
+  } finally {
+    maintainingItem.value = false
   }
 }
 
