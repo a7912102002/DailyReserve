@@ -3,7 +3,7 @@
       <header class="page-header">
         <button class="menu-toggle" @click="toggleSidebar">☰</button>
         <div><h1>總覽</h1><p>掌握所有品項的維護與庫存狀態</p></div>
-        <button class="add-button" @click="addItem"><span>＋</span> 新增品項</button>
+        <button class="add-button" @click="showAddModal = true"><span>＋</span> 新增品項</button>
       </header>
 
       <section class="stats-grid">
@@ -23,7 +23,7 @@
             <thead><tr><th>品項</th><th>類型</th><th>放置位置</th><th>下次維護</th><th>目前數量</th><th>狀態</th><th>操作</th></tr></thead>
             <tbody>
               <tr v-for="item in filteredItems" :key="item.id">
-                <td><div class="item-name"><span class="thumb">{{ item.emoji }}</span><b>{{ item.name }}</b></div></td>
+                <td><div class="item-name"><span class="thumb"><img v-if="item.image" :src="item.image" alt="" />{{ item.image ? '' : item.emoji }}</span><b>{{ item.name }}</b></div></td>
                 <td><span class="badge" :class="item.type === '庫存備品' ? 'orange' : 'green'">{{ item.type }}</span></td>
                 <td>{{ item.place }}</td><td>{{ item.date??'-' }}</td><td>{{ item.count??'-' }}</td>
                 <td><span class="badge" :class="item.status === '正常' ? 'green' : item.status === '即將到期' ? 'orange' : 'red'">{{ item.status }}</span></td>
@@ -44,11 +44,13 @@
           </div>
         </footer>
       </section>
+      <AddItemModal v-if="showAddModal" @close="showAddModal = false" @created="itemCreated" />
   </div>
 </template>
 
 <script setup>
 import { computed, inject, onMounted, ref } from 'vue'
+import AddItemModal from './AddItemModal.vue'
 
 const toggleSidebar = inject('toggleSidebar', () => {})
 const stats = [
@@ -61,6 +63,7 @@ const stats = [
 const items = ref([])
 const loading = ref(true)
 const loadError = ref('')
+const showAddModal = ref(false)
 const search = ref('')
 const page = ref(1)
 const pageSize = 15
@@ -105,15 +108,9 @@ function goToPage(pageNumber) {
   loadItems()
 }
 
-async function addItem() {
-  const response = await fetch('/api/items/create', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      name: '新日常用品', emoji: '📦', type: '定期維護', place: '尚未設定',
-      date: null, count: null, status: '正常',
-    }),
-  })
-  if (response.ok) await loadItems()
+async function itemCreated() {
+  showAddModal.value = false
+  page.value = 1
+  await loadItems()
 }
 </script>

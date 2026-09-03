@@ -18,6 +18,9 @@ database.exec(`
   )
 `)
 
+const columns = database.prepare('PRAGMA table_info(items)').all()
+if (!columns.some((column) => column.name === 'image')) database.exec('ALTER TABLE items ADD COLUMN image TEXT')
+
 const defaultItems = [
   // ['櫃檯平板', '🖥️', '定期維護', '櫃檯', '2026/09/09', null, '正常'],
   // ['咖啡機', '☕', '定期維護', '茶水間', '2026/09/05', null, '即將到期'],
@@ -84,9 +87,9 @@ const server = createServer(async (request, response) => {
       const item = await readJson(request)
       if (!validItem(item)) return sendJson(response, 400, { message: '名稱、類型、位置與狀態為必填' })
       const result = database.prepare(`
-        INSERT INTO items (name, emoji, type, place, date, count, status)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-      `).run(item.name, item.emoji || '📦', item.type, item.place, item.date ?? null, item.count ?? null, item.status)
+        INSERT INTO items (name, emoji, type, place, date, count, status, image)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(item.name, item.emoji || '📦', item.type, item.place, item.date ?? null, item.count ?? null, item.status, item.image ?? null)
       return sendJson(response, 201, database.prepare('SELECT * FROM items WHERE id = ?').get(result.lastInsertRowid))
     }
 
