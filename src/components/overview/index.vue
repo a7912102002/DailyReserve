@@ -20,12 +20,12 @@
         </div>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>品項</th><th>類型</th><th>放置位置</th><th>下次維護日</th><th>狀態</th><th>操作</th></tr></thead>
+            <thead><tr><th>品項</th><th>類型</th><th>放置位置</th><th>下次維護</th><th>目前數量</th><th>狀態</th><th>操作</th></tr></thead>
             <tbody>
               <tr v-for="item in filteredItems" :key="item.name">
                 <td><div class="item-name"><span class="thumb">{{ item.emoji }}</span><b>{{ item.name }}</b></div></td>
                 <td><span class="badge" :class="item.type === '庫存備品' ? 'orange' : 'green'">{{ item.type }}</span></td>
-                <td>{{ item.place }}</td><td>{{ item.date }}</td>
+                <td>{{ item.place }}</td><td>{{ item.date??'-' }}</td><td>{{ item.count??'-' }}</td>
                 <td><span class="badge" :class="item.status === '正常' ? 'green' : item.status === '即將到期' ? 'orange' : 'red'">{{ item.status }}</span></td>
                 <td><button class="more" aria-label="更多操作">⋮</button></td>
               </tr>
@@ -53,13 +53,13 @@ const stats = [
   { label: '庫存不足', value: 3, icon: '◇', tone: 'red' },
 ]
 const items = ref([
-  { name: '櫃檯平板', emoji: '🖥️', type: '定期維護', place: '櫃檯', date: '2026/09/09', status: '正常' },
-  { name: '咖啡機', emoji: '☕', type: '定期維護', place: '茶水間', date: '2026/09/05', status: '即將到期' },
-  { name: '無線吸塵器', emoji: '🧹', type: '定期維護', place: '儲藏室', date: '2026/09/12', status: '正常' },
-  { name: '訪客用雨傘', emoji: '☂️', type: '庫存備品', place: '玄關雨傘架', date: '2026/09/18', status: '正常' },
-  { name: '急救箱', emoji: '🧰', type: '庫存備品', place: '茶水間櫃子', date: '2026/09/25', status: '正常' },
-  { name: '延長線組', emoji: '🔌', type: '庫存備品', place: '會議室櫃子', date: '-', status: '庫存不足' },
-  { name: '空氣清淨機', emoji: '🌬️', type: '定期維護', place: '辦公區域', date: '2026/10/01', status: '正常' },
+  { name: '櫃檯平板', emoji: '🖥️', type: '定期維護', place: '櫃檯', date: '2026/09/09', count: null, status: '正常' },
+  { name: '咖啡機', emoji: '☕', type: '定期維護', place: '茶水間', date: '2026/09/05', count: null, status: '即將到期' },
+  { name: '無線吸塵器', emoji: '🧹', type: '定期維護', place: '儲藏室', date: '2026/09/12', count: null, status: '正常' },
+  { name: '訪客用雨傘', emoji: '☂️', type: '庫存備品', place: '玄關雨傘架', date: null, count: 8, status: '正常' },
+  { name: '急救箱', emoji: '🧰', type: '庫存備品', place: '茶水間櫃子', date: null, count: 8, status: '正常' },
+  { name: '延長線組', emoji: '🔌', type: '庫存備品', place: '會議室櫃子', date: null, count: 1, status: '庫存不足' },
+  { name: '空氣清淨機', emoji: '🌬️', type: '定期維護', place: '辦公區域', date: '2026/10/01', count: null, status: '正常' },
 ])
 const search = ref('')
 const page = ref(1)
