@@ -2,7 +2,7 @@
   <aside class="sidebar" :class="{ open }">
     <div class="brand">
       <span class="brand-mark">▤</span>
-      <span>日常用品維護</span>
+      <span>常備日和</span>
     </div>
 
     <nav>
