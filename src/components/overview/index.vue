@@ -26,7 +26,7 @@
                 <td><div class="item-name"><button v-if="item.image" class="thumb image-preview-button" type="button" :aria-label="`放大查看${item.name}圖片`" @click="previewImage = item.image"><img :src="item.image" :alt="item.name" /></button><span v-else class="thumb">{{ item.type === ITEM_TYPE.STOCK ? '◇' : '▣' }}</span><b>{{ item.name }}</b></div></td>
                 <td><span class="badge" :class="statusTone(item.status)">{{ getItemStatusLabel(item.status) }}</span></td>
                 <td><div class="item-count"><span>{{ item.count??'-' }}</span><button v-if="item.type === ITEM_TYPE.STOCK && item.count > 0" class="use-one-button" type="button" @click="itemToUse = item">我用了一個</button></div></td>
-                <td><div class="maintenance-cell"><span>{{ item.date??'-' }}</span><button v-if="item.type === ITEM_TYPE.MAINTENANCE && [ITEM_STATUS.EXPIRING_SOON, ITEM_STATUS.EXPIRED].includes(item.status)" class="maintained-button" type="button" @click="openMaintainModal(item)">已維護</button></div></td>
+                <td><div class="maintenance-cell"><span>{{ item.date??'-' }}</span><button v-if="item.type === ITEM_TYPE.MAINTENANCE && [ITEM_STATUS.EXPIRING_SOON, ITEM_STATUS.EXPIRED].includes(item.status)" class="maintained-button" type="button" @click="openMaintainModal(item)">已維護</button><button v-if="item.type === ITEM_TYPE.STOCK && [ITEM_STATUS.LOW_STOCK, ITEM_STATUS.OUT_OF_STOCK].includes(item.status)" class="maintained-button" type="button" @click="openRestockModal(item)">已補貨</button></div></td>
                 <td>{{ item.place && item.place !== '尚未設定' ? item.place : '-' }}</td>
                 <td><span class="badge" :class="item.type === ITEM_TYPE.STOCK ? 'orange' : 'green'">{{ getItemTypeLabel(item.type) }}</span></td>
                 <td><button class="more" aria-label="修改品項" @click="openEditModal(item)">⋮</button></td>
@@ -56,6 +56,25 @@
             <footer class="flex justify-end gap-3 [&_button]:h-10 [&_button]:min-w-24 [&_button]:cursor-pointer [&_button]:rounded-lg">
               <button class="border border-[#cbd1ce] bg-white" type="button" @click="itemToUse = null">取消</button>
               <button class="border-0 bg-[#087d4b] !text-white disabled:opacity-60" type="button" :disabled="usingItem" @click="useOneItem">{{ usingItem ? '處理中…' : '確定' }}</button>
+            </footer>
+          </section>
+        </div>
+      </Teleport>
+      <Teleport to="body">
+        <div v-if="itemToRestock" class="fixed inset-0 z-120 grid place-items-center bg-black/45 p-4" @click.self="itemToRestock = null">
+          <section class="w-full max-w-[410px] rounded-2xl bg-white p-6 shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="restock-title">
+            <h2 id="restock-title" class="m-0 text-xl">確認已完成補貨</h2>
+            <p class="mt-3 mb-4 text-[#555d59]">請確認「<b class="text-[#087747]">{{ itemToRestock.name }}</b>」的補貨數量：</p>
+            <div class="mb-4 flex items-center justify-center gap-4">
+              <button class="grid h-10 w-10 cursor-pointer place-items-center rounded-full border border-[#cbd1ce] bg-white text-xl disabled:cursor-not-allowed disabled:opacity-40" type="button" :disabled="restockAmount <= 1" @click="restockAmount--">−</button>
+              <input v-model.number="restockAmount" class="h-12 w-24 rounded-lg border border-[#cbd1ce] text-center text-lg outline-none focus:border-[#087d4b]" type="number" min="1" />
+              <button class="grid h-10 w-10 cursor-pointer place-items-center rounded-full border border-[#cbd1ce] bg-white text-xl" type="button" @click="restockAmount++">＋</button>
+            </div>
+            <p class="mb-4 text-center text-sm text-[#68706c]">目前 {{ itemToRestock.count ?? 0 }} 個，補貨後 {{ (itemToRestock.count ?? 0) + (Number(restockAmount) || 0) }} 個</p>
+            <p v-if="restockError" class="mb-3 text-sm text-red-600">{{ restockError }}</p>
+            <footer class="flex justify-end gap-3 [&_button]:h-10 [&_button]:min-w-24 [&_button]:cursor-pointer [&_button]:rounded-lg">
+              <button class="border border-[#cbd1ce] bg-white" type="button" @click="itemToRestock = null">取消</button>
+              <button class="border-0 bg-[#087d4b] !text-white disabled:opacity-60" type="button" :disabled="restockingItem || !Number.isInteger(restockAmount) || restockAmount < 1" @click="confirmRestock">{{ restockingItem ? '處理中…' : '確定' }}</button>
             </footer>
           </section>
         </div>
@@ -111,6 +130,10 @@ const itemToMaintain = ref(null)
 const maintenanceDate = ref('')
 const maintainingItem = ref(false)
 const maintainError = ref('')
+const itemToRestock = ref(null)
+const restockAmount = ref(1)
+const restockingItem = ref(false)
+const restockError = ref('')
 const selectedStatus = ref(null)
 const search = ref('')
 const page = ref(1)
@@ -170,6 +193,7 @@ function handleKeydown(event) {
     previewImage.value = ''
     itemToUse.value = null
     itemToMaintain.value = null
+    itemToRestock.value = null
   }
 }
 
@@ -242,6 +266,31 @@ async function confirmMaintained() {
     maintainError.value = error.message
   } finally {
     maintainingItem.value = false
+  }
+}
+
+function openRestockModal(item) {
+  itemToRestock.value = item
+  restockAmount.value = 1
+  restockError.value = ''
+}
+
+async function confirmRestock() {
+  restockingItem.value = true
+  restockError.value = ''
+  try {
+    const response = await fetch(`/api/items/${itemToRestock.value.id}/restock`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ amount: restockAmount.value }),
+    })
+    const result = await response.json()
+    if (!response.ok) throw new Error(result.message || '補貨失敗')
+    itemToRestock.value = null
+    await Promise.all([loadItems(), loadStats()])
+  } catch (error) {
+    restockError.value = error.message
+  } finally {
+    restockingItem.value = false
   }
 }
 

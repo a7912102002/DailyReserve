@@ -227,6 +227,28 @@ const server = createServer(async (request, response) => {
       return sendJson(response, 200, database.prepare(`SELECT ${itemColumns} FROM items WHERE id = ?`).get(id))
     }
 
+    const restockMatch = url.pathname.match(/^\/api\/items\/(\d+)\/restock$/)
+    if (request.method === 'POST' && restockMatch) {
+      const id = Number(restockMatch[1])
+      const { amount } = await readJson(request)
+      if (!Number.isInteger(amount) || amount < 1) return sendJson(response, 400, { message: '補貨數量必須是大於 0 的整數' })
+
+      const item = database.prepare(`SELECT ${itemColumns} FROM items WHERE id = ?`).get(id)
+      if (!item) return sendJson(response, 404, { message: '找不到這筆品項' })
+      if (item.type !== ITEM_TYPE.STOCK) return sendJson(response, 400, { message: '只有庫存備品可以執行補貨' })
+
+      database.prepare(`
+        UPDATE items
+        SET count = COALESCE(count, 0) + ?,
+            status = CASE
+              WHEN COALESCE(count, 0) + ? < COALESCE(threshold, 0) THEN ${ITEM_STATUS.OUT_OF_STOCK}
+              ELSE ${ITEM_STATUS.NORMAL}
+            END
+        WHERE id = ?
+      `).run(amount, amount, id)
+      return sendJson(response, 200, database.prepare(`SELECT ${itemColumns} FROM items WHERE id = ?`).get(id))
+    }
+
     if (request.method === 'PUT' && idMatch) {
       const id = Number(idMatch[1])
       const item = await readJson(request)
