@@ -33,9 +33,9 @@ async function refreshMaintenanceStatuses(db) {
   await db.sql`
     UPDATE items
     SET status = CASE
-      WHEN date < (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Taipei')::date THEN ${ITEM_STATUS.EXPIRED}
-      WHEN date <= (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Taipei')::date + 2 THEN ${ITEM_STATUS.EXPIRING_SOON}
-      ELSE ${ITEM_STATUS.NORMAL}
+      WHEN date < (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Taipei')::date THEN ${ITEM_STATUS.EXPIRED}::integer
+      WHEN date <= (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Taipei')::date + 2 THEN ${ITEM_STATUS.EXPIRING_SOON}::integer
+      ELSE ${ITEM_STATUS.NORMAL}::integer
     END
     WHERE type = ${ITEM_TYPE.MAINTENANCE} AND date IS NOT NULL
   `
@@ -124,7 +124,7 @@ export default async (request) => {
       const rows = await db.sql`
         UPDATE items SET count = count - 1,
           status = CASE WHEN count - 1 < COALESCE(threshold, 0)
-            THEN ${ITEM_STATUS.OUT_OF_STOCK} ELSE ${ITEM_STATUS.NORMAL} END
+            THEN ${ITEM_STATUS.OUT_OF_STOCK}::integer ELSE ${ITEM_STATUS.NORMAL}::integer END
         WHERE id = ${id} AND count > 0 RETURNING ${db.sql.raw(itemColumns)}
       `
       if (!rows[0]) return json({ message: '目前庫存已經是 0' }, 409)
@@ -159,7 +159,7 @@ export default async (request) => {
       const rows = await db.sql`
         UPDATE items SET count = COALESCE(count, 0) + ${amount},
           status = CASE WHEN COALESCE(count, 0) + ${amount} < COALESCE(threshold, 0)
-            THEN ${ITEM_STATUS.OUT_OF_STOCK} ELSE ${ITEM_STATUS.NORMAL} END
+            THEN ${ITEM_STATUS.OUT_OF_STOCK}::integer ELSE ${ITEM_STATUS.NORMAL}::integer END
         WHERE id = ${id} RETURNING ${db.sql.raw(itemColumns)}
       `
       return json(rows[0])
