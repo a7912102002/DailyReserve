@@ -1,9 +1,10 @@
 <template>
   <aside class="sidebar" :class="{ open }">
     <div class="brand">
-      <span class="brand-mark">▤</span>
-      <span>常備日和</span>
+      <span>DAILY<br />RESERVE</span>
     </div>
+
+    <p class="brand-caption">存下生活的從容<br />從細節開始。</p>
 
     <nav>
       <button
@@ -17,7 +18,8 @@
       </button>
     </nav>
 
-    <button class="help"><span>?</span> 使用說明</button>
+    <div class="sidebar-decoration" aria-hidden="true"><i></i><i></i><i></i></div>
+    <small class="sidebar-footer">DAILY RESERVE<br />EST. 2024<br />FOR A CALMER HOME</small>
   </aside>
 </template>
 

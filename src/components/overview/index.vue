@@ -1,39 +1,60 @@
 <template>
   <div class="overview-page">
-    <header class="page-header">
-      <button class="menu-toggle" @click="toggleSidebar">☰</button>
-      <div>
-        <h1>總覽</h1>
-        <p>掌握所有物品的維護與庫存狀態</p>
-      </div>
-      <button class="add-button" @click="openAddModal"><span>＋</span> 新增物品</button>
+    <header class="mobile-app-bar">
+      <button class="menu-toggle" type="button" aria-label="開啟側邊選單" @click="toggleSidebar">☰</button>
+      <strong>DAILY RESERVE</strong>
+      <span class="mobile-app-bar-actions"><span aria-hidden="true">♧</span><i>J</i></span>
     </header>
+
+    <section class="page-header">
+      <div class="hero-copy">
+        <h1>日常備品，一目了然。</h1>
+        <p>把每一件需要記得的事，收進安定的日常。</p>
+      </div>
+      <div class="hero-decoration" aria-hidden="true">
+        <i class="orb orb-one"></i>
+        <i class="orb orb-two"></i>
+        <div class="mascot">
+          <span class="mascot-hair"></span>
+          <span class="mascot-eye left"></span>
+          <span class="mascot-eye right"></span>
+          <span class="mascot-smile"></span>
+          <span class="mascot-box">▣</span>
+        </div>
+      </div>
+      <span class="hero-note">從生活的細節開始，<br />讓日常變得更輕鬆。</span>
+    </section>
 
     <section class="stats-grid">
       <article
         v-for="stat in stats"
         :key="stat.label"
         class="stat-card"
-        :class="{ selected: selectedStatus === stat.status }"
+        :class="[stat.tone, { selected: selectedStatus === stat.status }]"
         role="button"
         tabindex="0"
         @click="filterByStatus(stat.status)"
         @keydown.enter="filterByStatus(stat.status)"
         @keydown.space.prevent="filterByStatus(stat.status)"
       >
-        <div>
-          <p>{{ stat.label }}</p>
-          <strong>{{ stat.value }}</strong
-          ><small>個</small>
-        </div>
         <div class="stat-icon" :class="stat.tone">{{ stat.icon }}</div>
+        <div class="stat-content">
+          <p>{{ stat.label }}</p>
+          <strong>{{ stat.value }}</strong><small>項物品</small>
+        </div>
       </article>
     </section>
 
     <section class="items-card">
       <div class="list-toolbar">
-        <h2>物品清單</h2>
-        <label class="search-box"><span>⌕</span><input v-model="search" placeholder="搜尋物品名稱、分類或位置" /></label>
+        <div class="list-heading">
+          <h2>物品清單</h2>
+          <button class="filter-button" type="button" aria-label="搜尋及篩選物品" @click="focusSearch">☷</button>
+        </div>
+        <div class="toolbar-actions">
+          <label class="search-box"><span>⌕</span><input ref="searchInput" v-model="search" placeholder="搜尋物品" /></label>
+          <button class="add-button" type="button" @click="openAddModal"><span>＋</span> 新增物品</button>
+        </div>
       </div>
       <div class="table-wrap">
         <table>
@@ -50,7 +71,7 @@
           </thead>
           <tbody>
             <tr v-for="item in filteredItems" :key="item.id">
-              <td>
+              <td data-label="物品名稱">
                 <div class="item-name">
                   <button
                     v-if="item.image"
@@ -64,10 +85,10 @@
                   ><b>{{ item.name }}</b>
                 </div>
               </td>
-              <td>
+              <td data-label="狀態">
                 <span class="badge" :class="statusTone(item.status)">{{ getItemStatusLabel(item.status) }}</span>
               </td>
-              <td>
+              <td data-label="目前數量">
                 <div class="item-count">
                   <span>{{ item.count ?? '-' }}</span
                   ><button v-if="item.type === ITEM_TYPE.STOCK && item.count > 0" class="use-one-button" type="button" @click="itemToUse = item">
@@ -75,7 +96,7 @@
                   </button>
                 </div>
               </td>
-              <td>
+              <td data-label="下次維護">
                 <div class="maintenance-cell">
                   <span>{{ item.date ?? '-' }}</span
                   ><button
@@ -95,11 +116,11 @@
                   </button>
                 </div>
               </td>
-              <td>{{ item.place && item.place !== '尚未設定' ? item.place : '-' }}</td>
-              <td>
-                <span class="badge" :class="item.type === ITEM_TYPE.STOCK ? 'orange' : 'green'">{{ getItemTypeLabel(item.type) }}</span>
+              <td data-label="位置">{{ item.place && item.place !== '尚未設定' ? item.place : '-' }}</td>
+              <td data-label="分類">
+                <span class="badge category-badge" :class="item.type === ITEM_TYPE.STOCK ? 'orange' : 'green'">{{ getItemTypeLabel(item.type) }}</span>
               </td>
-              <td>
+              <td data-label="編輯">
                 <button class="more" aria-label="修改物品" @click="openEditModal(item)">⋮</button>
               </td>
             </tr>
@@ -276,7 +297,7 @@ const stats = computed(() => [
     label: getItemStatusLabel(ITEM_STATUS.LOW_STOCK),
     status: ITEM_STATUS.LOW_STOCK,
     value: statusCounts.value[ITEM_STATUS.LOW_STOCK] || 0,
-    icon: '✓',
+    icon: '▣',
     tone: 'orange'
   },
   {
@@ -313,6 +334,7 @@ const restockingItem = ref(false)
 const restockError = ref('')
 const selectedStatus = ref(null)
 const search = ref('')
+const searchInput = ref(null)
 const page = ref(1)
 const pageSize = 15
 const totalCount = ref(0)
@@ -395,6 +417,10 @@ function filterByStatus(status) {
   selectedStatus.value = status
   page.value = 1
   loadItems()
+}
+
+function focusSearch() {
+  searchInput.value?.focus()
 }
 
 function openAddModal() {

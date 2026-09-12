@@ -16,15 +16,15 @@ import { RouterView } from 'vue-router'
 import Sidebar from '@/layouts/Sidebar.vue'
 
 const navItems = [
-  ['總覽', '⌂']
-  // ['物品管理', '▣'],
-  // ['提醒管理', '♧'],
-  // ['維護紀錄', '☑'],
-  // ['統計報表', '▥'],
-  // ['設定', '⚙'],
+  ['首頁', '⌂'],
+  ['物品管理', '▣'],
+  ['維護提醒', '♧'],
+  ['分類管理', '▱'],
+  ['統計報表', '▥'],
+  ['設定', '⚙']
 ]
 
-const activeNav = ref('總覽')
+const activeNav = ref('首頁')
 const mobileOpen = ref(false)
 
 function selectNav(nav) {
