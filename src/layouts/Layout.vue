@@ -1,11 +1,6 @@
 <template>
   <div class="app-shell">
-    <Sidebar
-      :open="mobileOpen"
-      :active-nav="activeNav"
-      :nav-items="navItems"
-      @select="selectNav"
-    />
+    <Sidebar :open="mobileOpen" :active-nav="activeNav" :nav-items="navItems" @select="selectNav" />
 
     <button
       v-if="mobileOpen"
