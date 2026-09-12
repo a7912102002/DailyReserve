@@ -20,13 +20,13 @@ database.exec(`
 `)
 
 const columns = database.prepare('PRAGMA table_info(items)').all()
-if (!columns.some((column) => column.name === 'image')) database.exec('ALTER TABLE items ADD COLUMN image TEXT')
-if (!columns.some((column) => column.name === 'last_date')) database.exec('ALTER TABLE items ADD COLUMN last_date TEXT')
-if (!columns.some((column) => column.name === 'cycle')) database.exec('ALTER TABLE items ADD COLUMN cycle INTEGER')
-if (!columns.some((column) => column.name === 'threshold')) database.exec('ALTER TABLE items ADD COLUMN threshold INTEGER')
-if (columns.some((column) => column.name === 'emoji')) database.exec('ALTER TABLE items DROP COLUMN emoji')
-if (columns.some((column) => column.name === 'cycle_unit')) database.exec('ALTER TABLE items DROP COLUMN cycle_unit')
-const typeColumn = columns.find((column) => column.name === 'type')
+if (!columns.some(column => column.name === 'image')) database.exec('ALTER TABLE items ADD COLUMN image TEXT')
+if (!columns.some(column => column.name === 'last_date')) database.exec('ALTER TABLE items ADD COLUMN last_date TEXT')
+if (!columns.some(column => column.name === 'cycle')) database.exec('ALTER TABLE items ADD COLUMN cycle INTEGER')
+if (!columns.some(column => column.name === 'threshold')) database.exec('ALTER TABLE items ADD COLUMN threshold INTEGER')
+if (columns.some(column => column.name === 'emoji')) database.exec('ALTER TABLE items DROP COLUMN emoji')
+if (columns.some(column => column.name === 'cycle_unit')) database.exec('ALTER TABLE items DROP COLUMN cycle_unit')
+const typeColumn = columns.find(column => column.name === 'type')
 if (typeColumn && typeColumn.type.toUpperCase() !== 'INTEGER') {
   database.exec(`
     ALTER TABLE items RENAME COLUMN type TO old_type;
@@ -35,7 +35,7 @@ if (typeColumn && typeColumn.type.toUpperCase() !== 'INTEGER') {
     ALTER TABLE items DROP COLUMN old_type;
   `)
 }
-const statusColumn = columns.find((column) => column.name === 'status')
+const statusColumn = columns.find(column => column.name === 'status')
 if (statusColumn && statusColumn.type.toUpperCase() !== 'INTEGER') {
   database.exec(`
     ALTER TABLE items RENAME COLUMN status TO old_status;
@@ -92,18 +92,20 @@ async function readJson(request) {
 }
 
 function validItem(item) {
-  return Object.values(ITEM_TYPE).includes(item.type) && Object.values(ITEM_STATUS).includes(item.status) && ['name', 'place'].every(
-    (field) => typeof item[field] === 'string' && item[field].trim(),
+  return (
+    Object.values(ITEM_TYPE).includes(item.type) &&
+    Object.values(ITEM_STATUS).includes(item.status) &&
+    ['name', 'place'].every(field => typeof item[field] === 'string' && item[field].trim())
   )
 }
 
 const itemColumns = 'id, name, type, place, date, count, status, image, last_date, cycle, threshold'
-const statusOrderSql = ITEM_STATUS_SORT_ORDER
-  .map((status, index) => `WHEN ${status} THEN ${index + 1}`)
-  .join(' ')
+const statusOrderSql = ITEM_STATUS_SORT_ORDER.map((status, index) => `WHEN ${status} THEN ${index + 1}`).join(' ')
 
 function refreshMaintenanceStatuses() {
-  database.prepare(`
+  database
+    .prepare(
+      `
     UPDATE items
     SET status = CASE
       WHEN date(replace(date, '/', '-')) < date('now', 'localtime')
@@ -113,7 +115,9 @@ function refreshMaintenanceStatuses() {
       ELSE ${ITEM_STATUS.NORMAL}
     END
     WHERE type = ${ITEM_TYPE.MAINTENANCE} AND date IS NOT NULL
-  `).run()
+  `
+    )
+    .run()
 }
 
 const server = createServer(async (request, response) => {
@@ -124,12 +128,16 @@ const server = createServer(async (request, response) => {
     refreshMaintenanceStatuses()
 
     if (request.method === 'GET' && url.pathname === '/api/items/stats') {
-      const stats = database.prepare(`
+      const stats = database
+        .prepare(
+          `
         SELECT status, COUNT(*) AS count
         FROM items
         GROUP BY status
         ORDER BY status
-      `).all()
+      `
+        )
+        .all()
       return sendJson(response, 200, stats)
     }
 
@@ -149,7 +157,9 @@ const server = createServer(async (request, response) => {
       const queryParams = state === null ? [] : [state]
       const totalCount = database.prepare(`SELECT COUNT(*) AS count FROM items ${whereClause}`).get(...queryParams).count
       const totalPage = Math.ceil(totalCount / pageSize)
-      const list = database.prepare(`
+      const list = database
+        .prepare(
+          `
         SELECT ${itemColumns}
         FROM items ${whereClause}
         ORDER BY
@@ -163,23 +173,39 @@ const server = createServer(async (request, response) => {
           END ASC,
           id
         LIMIT ? OFFSET ?
-      `)
+      `
+        )
         .all(...queryParams, pageSize, (pageNum - 1) * pageSize)
 
       return sendJson(response, 200, {
         State: 'SUCCESS',
         StateCode: 200,
-        Data: { PageNum: pageNum, PageSize: pageSize, TotalCount: totalCount, TotalPage: totalPage, List: list },
+        Data: { PageNum: pageNum, PageSize: pageSize, TotalCount: totalCount, TotalPage: totalPage, List: list }
       })
     }
 
     if (request.method === 'POST' && url.pathname === '/api/items/create') {
       const item = await readJson(request)
-      if (!validItem(item)) return sendJson(response, 400, { message: '名稱、類型、位置與狀態為必填' })
-      const result = database.prepare(`
+      if (!validItem(item)) return sendJson(response, 400, { message: '名稱、分類、位置與狀態為必填' })
+      const result = database
+        .prepare(
+          `
         INSERT INTO items (name, type, place, date, count, status, image, last_date, cycle, threshold)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(item.name, item.type, item.place, item.date ?? null, item.count ?? null, item.status, item.image ?? null, item.lastDate ?? null, item.cycle ?? null, item.threshold ?? null)
+      `
+        )
+        .run(
+          item.name,
+          item.type,
+          item.place,
+          item.date ?? null,
+          item.count ?? null,
+          item.status,
+          item.image ?? null,
+          item.lastDate ?? null,
+          item.cycle ?? null,
+          item.threshold ?? null
+        )
       refreshMaintenanceStatuses()
       return sendJson(response, 201, database.prepare(`SELECT ${itemColumns} FROM items WHERE id = ?`).get(result.lastInsertRowid))
     }
@@ -188,11 +214,13 @@ const server = createServer(async (request, response) => {
     if (request.method === 'POST' && useOneMatch) {
       const id = Number(useOneMatch[1])
       const item = database.prepare(`SELECT ${itemColumns} FROM items WHERE id = ?`).get(id)
-      if (!item) return sendJson(response, 404, { message: '找不到這筆品項' })
+      if (!item) return sendJson(response, 404, { message: '找不到這筆物品' })
       if (item.type !== ITEM_TYPE.STOCK) return sendJson(response, 400, { message: '只有庫存備品可以執行此操作' })
       if (item.count === null || item.count <= 0) return sendJson(response, 400, { message: '目前庫存已經是 0' })
 
-      database.prepare(`
+      database
+        .prepare(
+          `
         UPDATE items
         SET count = count - 1,
             status = CASE
@@ -200,7 +228,9 @@ const server = createServer(async (request, response) => {
               ELSE ${ITEM_STATUS.NORMAL}
             END
         WHERE id = ?
-      `).run(id)
+      `
+        )
+        .run(id)
       return sendJson(response, 200, database.prepare(`SELECT ${itemColumns} FROM items WHERE id = ?`).get(id))
     }
 
@@ -213,16 +243,20 @@ const server = createServer(async (request, response) => {
       }
 
       const item = database.prepare(`SELECT ${itemColumns} FROM items WHERE id = ?`).get(id)
-      if (!item) return sendJson(response, 404, { message: '找不到這筆品項' })
-      if (item.type !== ITEM_TYPE.MAINTENANCE) return sendJson(response, 400, { message: '只有定期維護品項可以執行此操作' })
+      if (!item) return sendJson(response, 404, { message: '找不到這筆物品' })
+      if (item.type !== ITEM_TYPE.MAINTENANCE) return sendJson(response, 400, { message: '只有定期維護物品可以執行此操作' })
 
-      database.prepare(`
+      database
+        .prepare(
+          `
         UPDATE items
         SET last_date = ?,
             cycle = COALESCE(cycle, 7),
             date = strftime('%Y/%m/%d', date(?, '+' || COALESCE(cycle, 7) || ' days'))
         WHERE id = ?
-      `).run(maintenanceDate, maintenanceDate, id)
+      `
+        )
+        .run(maintenanceDate, maintenanceDate, id)
       refreshMaintenanceStatuses()
       return sendJson(response, 200, database.prepare(`SELECT ${itemColumns} FROM items WHERE id = ?`).get(id))
     }
@@ -234,10 +268,12 @@ const server = createServer(async (request, response) => {
       if (!Number.isInteger(amount) || amount < 1) return sendJson(response, 400, { message: '補貨數量必須是大於 0 的整數' })
 
       const item = database.prepare(`SELECT ${itemColumns} FROM items WHERE id = ?`).get(id)
-      if (!item) return sendJson(response, 404, { message: '找不到這筆品項' })
+      if (!item) return sendJson(response, 404, { message: '找不到這筆物品' })
       if (item.type !== ITEM_TYPE.STOCK) return sendJson(response, 400, { message: '只有庫存備品可以執行補貨' })
 
-      database.prepare(`
+      database
+        .prepare(
+          `
         UPDATE items
         SET count = COALESCE(count, 0) + ?,
             status = CASE
@@ -245,26 +281,44 @@ const server = createServer(async (request, response) => {
               ELSE ${ITEM_STATUS.NORMAL}
             END
         WHERE id = ?
-      `).run(amount, amount, id)
+      `
+        )
+        .run(amount, amount, id)
       return sendJson(response, 200, database.prepare(`SELECT ${itemColumns} FROM items WHERE id = ?`).get(id))
     }
 
     if (request.method === 'PUT' && idMatch) {
       const id = Number(idMatch[1])
       const item = await readJson(request)
-      if (!validItem(item)) return sendJson(response, 400, { message: '名稱、類型、位置與狀態為必填' })
-      const result = database.prepare(`
+      if (!validItem(item)) return sendJson(response, 400, { message: '名稱、分類、位置與狀態為必填' })
+      const result = database
+        .prepare(
+          `
         UPDATE items SET name = ?, type = ?, place = ?, date = ?, count = ?, status = ?, image = ?, last_date = ?, cycle = ?, threshold = ?
         WHERE id = ?
-      `).run(item.name, item.type, item.place, item.date ?? null, item.count ?? null, item.status, item.image ?? null, item.lastDate ?? null, item.cycle ?? null, item.threshold ?? null, id)
-      if (result.changes === 0) return sendJson(response, 404, { message: '找不到這筆品項' })
+      `
+        )
+        .run(
+          item.name,
+          item.type,
+          item.place,
+          item.date ?? null,
+          item.count ?? null,
+          item.status,
+          item.image ?? null,
+          item.lastDate ?? null,
+          item.cycle ?? null,
+          item.threshold ?? null,
+          id
+        )
+      if (result.changes === 0) return sendJson(response, 404, { message: '找不到這筆物品' })
       refreshMaintenanceStatuses()
       return sendJson(response, 200, database.prepare(`SELECT ${itemColumns} FROM items WHERE id = ?`).get(id))
     }
 
     if (request.method === 'DELETE' && idMatch) {
       const result = database.prepare('DELETE FROM items WHERE id = ?').run(Number(idMatch[1]))
-      if (result.changes === 0) return sendJson(response, 404, { message: '找不到這筆品項' })
+      if (result.changes === 0) return sendJson(response, 404, { message: '找不到這筆物品' })
       response.writeHead(204)
       return response.end()
     }

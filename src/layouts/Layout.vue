@@ -2,12 +2,7 @@
   <div class="app-shell">
     <Sidebar :open="mobileOpen" :active-nav="activeNav" :nav-items="navItems" @select="selectNav" />
 
-    <button
-      v-if="mobileOpen"
-      class="sidebar-backdrop"
-      aria-label="關閉側邊選單"
-      @click="mobileOpen = false"
-    />
+    <button v-if="mobileOpen" class="sidebar-backdrop" aria-label="關閉側邊選單" @click="mobileOpen = false" />
 
     <main>
       <RouterView />
@@ -21,8 +16,8 @@ import { RouterView } from 'vue-router'
 import Sidebar from '@/layouts/Sidebar.vue'
 
 const navItems = [
-  ['總覽', '⌂'],
-  // ['品項管理', '▣'],
+  ['總覽', '⌂']
+  // ['物品管理', '▣'],
   // ['提醒管理', '♧'],
   // ['維護紀錄', '☑'],
   // ['統計報表', '▥'],
